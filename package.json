@@ -1,0 +1,17 @@
+{
+  "name": "@mactser/database",
+  "version": "1.0.0",
+  "description": "Client for Macstudio Database",
+  "main": "index.js",
+  "contributors": [
+    {
+      "name": "Traptych",
+      "url": "https://github.com/traptych/macster-db"
+    }
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/traptych/macster-db.git"
+  }
+}
