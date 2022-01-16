@@ -22,6 +22,7 @@ const Database = function (authorization, url) {
     * @param {string} [options.method] request method
     * @param {object} [options.headers={}] request headers
     * @param {string} data request data
+    * @returns {object} response request response
 */
 Database.prototype.request = function (options, data) {
     const type = data ? typeof data.on === 'function' : false;
