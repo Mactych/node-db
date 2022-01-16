@@ -11,7 +11,7 @@ const Database = function (authorization, url) {
     if (!url) throw new TypeError("database.construct() valid database url must be provided");
     const parsedURL = url ? new URL(url) : {};
     this.connection = { hostname: parsedURL["hostname"] ? parsedURL["hostname"] : "database.macstudio.pro" }
-    this.connection.protocol = parsedURL ? parsedURL["protocol"] === "https:" ? https : http : "https:";
+    this.connection.protocol = parsedURL ? (parsedURL["protocol"] === "https:" ? https : http) : "https:";
     this.connection["authorization"] = authorization;
     if (parsedURL["port"]) this.connection["port"] = parsedURL["port"];
 }
