@@ -8,9 +8,9 @@ const https = require("https");
 */
 const Database = function (authorization, url) {
     if (!authorization) throw new TypeError("database.construct() valid authorization token must be provided");
-    const parsedURL = url ? new URL(url) : {};
+    const parsedURL = url ? new URL(url) : {"protocol": "https:", "port": 443};
     this.connection = { hostname: parsedURL["hostname"] ? parsedURL["hostname"] : "database.macstudio.pro" }
-    this.connection.protocol = parsedURL ? (parsedURL["protocol"] === "https:" ? https : http) : "https:";
+    this.connection.protocol = parsedURL["protocol"] === "https:" ? https : http;
     this.connection["authorization"] = authorization;
     if (parsedURL["port"]) this.connection["port"] = parsedURL["port"];
 }
