@@ -1,7 +1,7 @@
 {
-  "name": "@mactser/database",
+  "name": "macdb",
   "version": "1.0.0",
-  "description": "Client for Macstudio Database",
+  "description": "",
   "main": "index.js",
   "contributors": [
     {
