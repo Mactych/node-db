@@ -1,34 +1,18 @@
-const http = require("http");
-const https = require("https");
-
-/**
-    * Create the database connection
-    * @param {String} auth Authorization token
-    * @param {String} url Custom database URL
-*/
-const Database = function (authorization, url) {
-    if (!authorization) throw new TypeError("database.construct() valid authorization token must be provided");
-    const parsedURL = url ? new URL(url) : {"protocol": "https:", "port": 443};
+const http = require("http"), https = require("https");
+const Database = function (token, url) {
+    if (!token) throw new TypeError("database.construct() valid token must be provided");
+    const parsedURL = url ? new URL(url) : { "protocol": "https:", "port": 443 };
     this.connection = { hostname: parsedURL["hostname"] ? parsedURL["hostname"] : "database.macstudio.pro" }
     this.connection.protocol = parsedURL["protocol"] === "https:" ? https : http;
-    this.connection["authorization"] = authorization;
-    if (parsedURL["port"]) this.connection["port"] = parsedURL["port"];
+    this.connection.token = token;
+    if (parsedURL["port"]) this.connection.pport = parsedURL["port"];
 }
-/**
-    * Create a network request
-    * @param {object} options request options
-    * @param {string} [options.path] request path
-    * @param {string} [options.method] request method
-    * @param {object} [options.headers={}] request headers
-    * @param {string} data request data
-    * @returns {object} response request response
-*/
-Database.prototype.request = function (options, data) {
+Database.prototype._request = function (options, data) {
     const type = data ? typeof data.on === 'function' : false;
     return new Promise(async (resolve, reject) => {
         try {
             const headers = options["headers"] ? options["headers"] : {};
-            headers["authorization"] = this.connection.authorization;
+            headers["authorization"] = this.connection.token;
             options["headers"] = headers;
             options["hostname"] = this.connection.hostname;
             if (this.connection.port) options["port"] = this.connection.port;
@@ -52,42 +36,10 @@ Database.prototype.request = function (options, data) {
         }
     });
 }
-
-/**
-    * Save data into the database
-    * @param {string} key key
-    * @param {string || stream || buffer} data data
-*/
-Database.prototype.set = async function (key, data) {
+Database.prototype._get = function (key) {
     return new Promise(async (resolve, reject) => {
         try {
-            const res = await this.request({
-                path: `/content/${encodeURIComponent(key)}`,
-                method: 'PUT',
-            }, data);
-            if (res.statusCode === 200) {
-                resolve();
-            } else {
-                reject(res.statusCode);
-            }
-        } catch (e) {
-            reject(e);
-        }
-    });
-}
-
-/**
-    * Get's a text value from the database
-    * @param {string} key Key
-    * @param {boolean} [options.raw=false] Makes it so that we return the raw string value. Default is false.
-    * @returns {any} data
-*/
-Database.prototype.get = async function (key, options) {
-    options = options ? options : {};
-    options.key = options.key ? options.key : false;
-    return new Promise(async (resolve, reject) => {
-        try {
-            const res = await this.request({
+            const res = await this._request({
                 path: `/content/${encodeURIComponent(key)}`,
                 method: 'GET',
             });
@@ -97,44 +49,52 @@ Database.prototype.get = async function (key, options) {
                     data.push(chunk);
                 }).on("end", async () => {
                     data = Buffer.concat(data);
-                    if (key.endsWith(".json") && !options.raw) {
-                        resolve(JSON.parse(data));
-                    } else {
-                        resolve(data);
-                    }
+                    resolve(JSON.parse(data));
                 });
+            } else if (res.statusCode === 404) {
+                resolve({});
             } else {
-                reject(res.statusCode);
+                throw {status: res.statusCode};
             }
         } catch (e) {
             reject(e);
         }
     });
 }
-
-
-/**
-    * Deletes a value from the database
-    * @param {string} key Key
-*/
-Database.prototype.delete = async function (key) {
+Database.prototype._set = function (key, data) {
     return new Promise(async (resolve, reject) => {
         try {
-            const res = await this.request({
+            const res = await this._request({
                 path: `/content/${encodeURIComponent(key)}`,
-                method: 'DELETE',
+                method: 'PUT',
             }, data);
             if (res.statusCode === 200) {
                 resolve();
             } else {
-                reject(res.statusCode);
+                throw {status: res.statusCode};
             }
         } catch (e) {
             reject(e);
         }
     });
 }
-
+Database.prototype._delete = function (key) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const res = await this._request({
+                path: `/content/${encodeURIComponent(key)}`,
+                method: 'DELETE',
+            });
+            if (res.statusCode === 200) {
+                resolve();
+            } else {
+                throw {status: res.statusCode};
+            }
+        } catch (e) {
+            reject(e);
+        }
+    });
+}
 /**
     * Lists all the files in a path
     * @param {string} key Key
@@ -143,7 +103,7 @@ Database.prototype.delete = async function (key) {
 Database.prototype.list = async function (key) {
     return new Promise(async (resolve, reject) => {
         try {
-            const res = await this.request({
+            const res = await this._request({
                 path: `/list/${encodeURIComponent(key)}`,
                 method: 'GET',
             });
@@ -160,6 +120,43 @@ Database.prototype.list = async function (key) {
         } catch (e) {
             reject(e);
         }
+    });
+}
+/**
+    * Retuns object to mainpulate another object
+    * @param {string} key key
+    * @param {object} defaults default values
+    * @returns {object} data
+*/
+Database.prototype.get = async function (key, defaults) {
+    return new Promise(async (resolve, reject) => {
+        const prototype = {
+            "_key": key,
+            "_database": this,
+            "_save": async function () {
+                return new Promise(async (resolve, reject) => {
+                    try {
+                        resolve(await this._database._set(this._key, JSON.stringify(this)));
+                    } catch(e) {
+                        reject(e);
+                    }
+                });
+            },
+            "_delete": async function () {
+                return new Promise(async (resolve, reject) => {
+                    try {
+                        resolve(await this._database._delete(this._key));
+                    } catch(e) {
+                        reject(e);
+                    }
+                });
+            },
+        };
+        const data = await this._get(key);
+        const item = Object.create(prototype);
+        Object.assign(item, defaults ? defaults : {});
+        Object.assign(item, data);
+        resolve(item);
     });
 }
 
